@@ -46,6 +46,9 @@ CBaseEntity
 #include "saverestore.h"
 #include "schedule.h"
 
+// for mdl functs
+#include "../engine/studio.h"
+
 #ifndef MONSTEREVENT_H
 #include "monsterevent.h"
 #endif
@@ -202,6 +205,7 @@ public:
 	virtual BOOL	IsNetClient( void ) { return FALSE; }
 	virtual const char *TeamID( void ) { return ""; }
 
+	void SetModelCollisionBox();
 
 //	virtual void	SetActivator( CBaseEntity *pActivator ) {}
 	virtual CBaseEntity *GetNextTarget( void );

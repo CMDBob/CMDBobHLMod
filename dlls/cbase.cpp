@@ -768,4 +768,93 @@ CBaseEntity * CBaseEntity::Create( char *szName, const Vector &vecOrigin, const 
 	return pEntity;
 }
 
+void TransformBBox( Vector angles, Vector &bbmin, Vector &bbmax )
+{
+	// this should work?
+	float rotmatrix[3][4];	// transformation matrix
 
+	float		angle;
+	float		sr, sp, sy, cr, cp, cy;
+
+	// work out yaw pitch and roll and that.
+	angle = angles[1] * ( M_PI * 2 / 360 );
+	sy = sin( angle );
+	cy = cos( angle );
+	angle = angles[0] * ( M_PI * 2 / 360 );
+	sp = sin( angle );
+	cp = cos( angle );
+	angle = angles[2] * ( M_PI * 2 / 360 );
+	sr = sin( angle );
+	cr = cos( angle );
+
+	// matrix = (YAW * PITCH) * ROLL
+	rotmatrix[0][0] = cp*cy;
+	rotmatrix[1][0] = cp*sy;
+	rotmatrix[2][0] = -sp;
+	rotmatrix[0][1] = sr*sp*cy + cr*-sy;
+	rotmatrix[1][1] = sr*sp*sy + cr*cy;
+	rotmatrix[2][1] = sr*cp;
+	rotmatrix[0][2] = ( cr*sp*cy + -sr*-sy );
+	rotmatrix[1][2] = ( cr*sp*sy + -sr*cy );
+	rotmatrix[2][2] = cr*cp;
+	rotmatrix[0][3] = 0.0;
+	rotmatrix[1][3] = 0.0;
+	rotmatrix[2][3] = 0.0;
+
+	// now we have the matrix, we can begin.
+
+	Vector bbmintemp = bbmin;
+	Vector bbmaxtemp = bbmax;
+
+	bbmin[0] = DotProduct( bbmintemp, rotmatrix[0] ) + rotmatrix[0][3];
+	bbmin[1] = DotProduct( bbmintemp, rotmatrix[1] ) + rotmatrix[1][3];
+	bbmin[2] = DotProduct( bbmintemp, rotmatrix[2] ) + rotmatrix[2][3];
+
+	bbmax[0] = DotProduct( bbmaxtemp, rotmatrix[0] ) + rotmatrix[0][3];
+	bbmax[1] = DotProduct( bbmaxtemp, rotmatrix[1] ) + rotmatrix[1][3];
+	bbmax[2] = DotProduct( bbmaxtemp, rotmatrix[2] ) + rotmatrix[2][3];
+
+	// now we need to check if min is bigger than max. if it is, swap it.
+	float temp;
+	//		a		b
+	if (bbmin[0] > bbmax[0])
+	{
+		temp = bbmin[0]; // temp = a
+		bbmin[0] = bbmax[0]; // a = b
+		bbmax[0] = temp; // b = temp(a)
+	}
+
+	if ( bbmin[1] > bbmax[1] )
+	{
+		temp = bbmin[1]; // temp = a
+		bbmin[1] = bbmax[1]; // a = b
+		bbmax[1] = temp; // b = temp(a)
+	}
+	if ( bbmin[2] > bbmax[2] )
+	{
+		temp = bbmin[2]; // temp = a
+		bbmin[2] = bbmax[2]; // a = b
+		bbmax[2] = temp; // b = temp(a)
+	}
+}
+
+void CBaseEntity::SetModelCollisionBox()
+{
+	studiohdr_t *pstudiohdr;
+	pstudiohdr = (studiohdr_t*)GET_MODEL_PTR( ENT( pev ) );
+
+	if ( pstudiohdr == NULL )
+	{
+		ALERT( at_console, "Unable to fetch model pointer!\n" );
+		return;
+	}
+	mstudioseqdesc_t    *pseqdesc;
+	pseqdesc = (mstudioseqdesc_t *)( (byte *)pstudiohdr + pstudiohdr->seqindex );
+
+	Vector bbmin = pseqdesc[pev->sequence].bbmin;
+	Vector bbmax = pseqdesc[pev->sequence].bbmax;
+
+	TransformBBox( pev->angles, bbmin, bbmax );
+
+	UTIL_SetSize( pev, bbmin, bbmax );
+}

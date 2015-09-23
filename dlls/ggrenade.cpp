@@ -383,7 +383,7 @@ CGrenade *CGrenade::ShootContact( entvars_t *pevOwner, Vector vecStart, Vector v
 }
 
 
-CGrenade * CGrenade:: ShootTimed( entvars_t *pevOwner, Vector vecStart, Vector vecVelocity, float time )
+CGrenade * CGrenade:: ShootTimed( entvars_t *pevOwner, Vector vecStart, Vector vecVelocity, float time, int dmg )
 {
 	CGrenade *pGrenade = GetClassPtr( (CGrenade *)NULL );
 	pGrenade->Spawn();
@@ -406,18 +406,20 @@ CGrenade * CGrenade:: ShootTimed( entvars_t *pevOwner, Vector vecStart, Vector v
 		pGrenade->pev->nextthink = gpGlobals->time;
 		pGrenade->pev->velocity = Vector( 0, 0, 0 );
 	}
-		
+	
+
+	SET_MODEL( ENT( pGrenade->pev ), "models/w_grenade.mdl" );
+
 	pGrenade->pev->sequence = RANDOM_LONG( 3, 6 );
-	pGrenade->pev->framerate = 1.0;
+	pGrenade->pev->framerate = 1.0f;
 
 	// Tumble through the air
-	// pGrenade->pev->avelocity.x = -400;
+	//pGrenade->pev->avelocity.x = -800; // i can see why dis was disabled. hmm. maybe have a model anim rather than avel?
 
-	pGrenade->pev->gravity = 0.5;
-	pGrenade->pev->friction = 0.8;
+	pGrenade->pev->gravity = 0.5f;
+	pGrenade->pev->friction = 0.8f;
 
-	SET_MODEL(ENT(pGrenade->pev), "models/w_grenade.mdl");
-	pGrenade->pev->dmg = 100;
+	pGrenade->pev->dmg = dmg;
 
 	return pGrenade;
 }

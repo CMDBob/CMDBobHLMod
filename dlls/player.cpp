@@ -495,10 +495,13 @@ int CBasePlayer :: TakeDamage( entvars_t *pevInflictor, entvars_t *pevAttacker, 
 			flArmor *= (1/flBonus);
 			flNew = flDamage - flArmor;
 			pev->armorvalue = 0;
+			SetSuitUpdate( "!HEV_E1", FALSE, SUIT_NEXT_IN_1MIN );
 		}
 		else
+		{
 			pev->armorvalue -= flArmor;
-		
+		}
+
 		flDamage = flNew;
 	}
 
@@ -569,10 +572,19 @@ int CBasePlayer :: TakeDamage( entvars_t *pevInflictor, entvars_t *pevAttacker, 
 		
 		if (bitsDamage & DMG_BULLET)
 		{
-			if (m_lastDamageAmount > 5)
-				SetSuitUpdate("!HEV_DMG6", FALSE, SUIT_NEXT_IN_30SEC);	// blood loss detected
+			if ( fmajor )
+			{
+				SetSuitUpdate( "!HEV_DMG8", FALSE, SUIT_NEXT_IN_30SEC ); // massive damage
+			}
+			else
+			{
+				if ( m_lastDamageAmount > 5 )
+					SetSuitUpdate( "!HEV_DMG6", FALSE, SUIT_NEXT_IN_30SEC );	// blood loss detected
+			}
+			
+			
 			//else
-			//	SetSuitUpdate("!HEV_DMG0", FALSE, SUIT_NEXT_IN_30SEC);	// minor laceration
+				//SetSuitUpdate("!HEV_DMG0", FALSE, SUIT_NEXT_IN_30SEC);	// minor laceration
 			
 			bitsDamage &= ~DMG_BULLET;
 			ffound = TRUE;
@@ -802,6 +814,38 @@ void CBasePlayer::PackDeadPlayerItems( void )
 	pWeaponBox->pev->velocity = pev->velocity * 1.2;// weaponbox has player's velocity, then some.
 
 	RemoveAllItems( TRUE );// now strip off everything that wasn't handled by the code above.
+}
+
+void CBasePlayer::DropWeaponOnDeath( void )
+{
+	CBasePlayerWeapon *CurrentWeapon;
+
+	CurrentWeapon = (CBasePlayerWeapon *)m_pActiveItem;
+
+	if ( !IsWeaponSlotted( CurrentWeapon->m_iId ) )
+	{
+		RemoveAllItems( TRUE );
+	}
+
+	CBasePlayerWeapon *DropPointer = (CBasePlayerWeapon *)CBaseEntity::Create( (char *)STRING( CurrentWeapon->pev->classname ), pev->origin, Vector( 0, 0, 0 ) );
+	if ( DropPointer )  //If the weapon creation was successful 
+	{
+		DropPointer->pev->velocity = pev->velocity;  // Inherit the player velocity  -  If you want to add a forward toss, add the vector here 
+		DropPointer->pev->avelocity = Vector( 0, RANDOM_FLOAT( 0, 100 ), 0 );  // This adds a bit of spin to the weapon. For more spin, increase the 100 value 
+		DropPointer->SetThink( &CBasePlayerItem::RetouchThink );  // This makes it so you can't initial pick up the weapon up. This avoids the problems where the weapon is constantly switched and new ones create (as use is held down for about a second) resulting in a no free edicts error. It also means you can add a delay before re-picking up, helping prevent counter-strike style weapon walks 
+		DropPointer->SetTouch( NULL );  // See above 
+		DropPointer->pev->nextthink = gpGlobals->time + 3.0;  // This is the delay before the weapon can be picked up again in seconds. This must be at least 1.0 to prevent errors and crashing. 
+		DropPointer->pev->solid = SOLID_NOT;  // This prevents the weapon getting stuck on the player and dropping very slowly. 
+		DropPointer->pev->spawnflags |= SF_NORESPAWN; // prevents the dropped weapon from respawning.
+		DropPointer->m_iDefaultAmmo = CurrentWeapon->m_iClip;  // This sets the ammunition for the weapon. 
+	}
+	else
+	{
+		ALERT( at_error, "Could not create dropped weapon\n" );  // If the weapon was not created properly, alert the player 
+	}
+
+	// get rid of everything else the player has.
+	RemoveAllItems( TRUE );
 }
 
 void CBasePlayer::RemoveAllItems( BOOL removeSuit )
@@ -1284,9 +1328,14 @@ void CBasePlayer::PlayerDeathThink(void)
 		// will sometimes crash coming back from CBasePlayer::Killed() if they kill their owner because the
 		// player class sometimes is freed. It's safer to manipulate the weapons once we know
 		// we aren't calling into any of their code anymore through the player pointer.
-		PackDeadPlayerItems();
+		//PackDeadPlayerItems();
+
+		DropWeaponOnDeath();
 	}
 
+	// clear any player weapon slots.
+	for ( int i = 0; i < MAX_PLAYER_WEAPON_SLOTS; i++ )
+		m_pSlots[i] = NULL;
 
 	if (pev->modelindex && (!m_fSequenceFinished) && (pev->deadflag == DEAD_DYING))
 	{
@@ -2282,11 +2331,11 @@ void CBasePlayer::CheckSuitUpdate()
 	// if in range of radiation source, ping geiger counter
 	UpdateGeigerCounter();
 
-	if ( g_pGameRules->IsMultiplayer() )
+	/**if ( g_pGameRules->IsMultiplayer() )
 	{
 		// don't bother updating HEV voice in multiplayer.
 		return;
-	}
+	}**/
 
 	if ( gpGlobals->time >= m_flSuitUpdate && m_flSuitUpdate > 0)
 	{
@@ -2342,11 +2391,11 @@ void CBasePlayer::SetSuitUpdate(char *name, int fgroup, int iNoRepeatTime)
 	if ( !(pev->weapons & (1<<WEAPON_SUIT)) )
 		return;
 
-	if ( g_pGameRules->IsMultiplayer() )
+	/**if ( g_pGameRules->IsMultiplayer() )
 	{
 		// due to static channel design, etc. We don't play HEV sounds in multiplayer right now.
 		return;
-	}
+	}*/
 
 	// if name == NULL, then clear out the queue
 
@@ -2932,6 +2981,10 @@ void CBasePlayer::Spawn( void )
 		m_rgAmmo[i] = 0;
 		m_rgAmmoLast[i] = 0;  // client ammo values also have to be reset  (the death hud clear messages does on the client side)
 	}
+
+	// clear any player weapon slots, just to make sure on first spawn.
+	for ( int i = 0; i < MAX_PLAYER_WEAPON_SLOTS; i++ )
+		m_pSlots[i] = NULL;
 
 	m_lastx = m_lasty = 0;
 	

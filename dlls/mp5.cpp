@@ -57,6 +57,8 @@ void CMP5::Spawn( )
 
 	m_iDefaultAmmo = MP5_DEFAULT_GIVE;
 
+	m_iCanChamberARound = true;
+
 	FallInit();// get ready to fall down.
 }
 
@@ -252,7 +254,18 @@ void CMP5::Reload( void )
 	if ( m_pPlayer->ammo_9mm <= 0 )
 		return;
 
-	DefaultReload( MP5_MAX_CLIP, MP5_RELOAD, 1.5 );
+	if ( m_iClip > 0 )
+	{
+		m_iHasRoundChambered = true;
+		DefaultReload( MP5_MAX_CLIP + 1, MP5_RELOAD, 1.5 );
+	}
+	else
+	{
+		m_iHasRoundChambered = false;
+		DefaultReload( MP5_MAX_CLIP, MP5_RELOAD, 1.5 );
+	}
+	
+
 }
 
 

@@ -164,7 +164,7 @@ void CEgon::UseAmmo( int count )
 void CEgon::Attack( void )
 {
 	// don't fire underwater
-	if ( m_pPlayer->pev->waterlevel == 3 )
+	/**if ( m_pPlayer->pev->waterlevel == 3 )
 	{
 		
 		if ( m_fireState != FIRE_OFF || m_pBeam )
@@ -176,6 +176,18 @@ void CEgon::Attack( void )
 			PlayEmptySound( );
 		}
 		return;
+	}*/
+
+	// rather than not working, we're gonna explode in water. makes sense for a prototype supergun.
+	if ( m_pPlayer->pev->waterlevel > 1 )
+	{
+		// get the remaining ammo to calculate how much damage the explosion will do, and then "use up" the ammo.
+		int remainingAmmo = m_pPlayer->m_rgAmmo[m_iPrimaryAmmoType];
+		m_pPlayer->m_rgAmmo[m_iPrimaryAmmoType] = 0;
+		// do damage!
+#ifndef CLIENT_DLL
+		::RadiusDamage( m_pPlayer->pev->origin, m_pPlayer->pev, m_pPlayer->pev, 35 * remainingAmmo, ( 35 * remainingAmmo ) + 40, CLASS_NONE, DMG_ENERGYBEAM | DMG_BLAST | DMG_ALWAYSGIB );
+#endif
 	}
 
 	UTIL_MakeVectors( m_pPlayer->pev->v_angle + m_pPlayer->pev->punchangle );

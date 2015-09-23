@@ -193,7 +193,8 @@ protected:
 		// This check will help prevent a class frome being defined later,
         //  that is larger than the max size MemoryPool is expecting,
         //  from being successfully allocated.
-        if (size > (unsigned long) CMiniMem::Instance()->MaxBlockSize())
+
+        if ( (unsigned int) size > (unsigned long) CMiniMem::Instance()->MaxBlockSize())
 		{
 #ifdef _WIN32
             throw "New particle class is larger than memory pool max size, update lMaxParticleClassSize() function.";

@@ -30,6 +30,16 @@
 #define SF_SPRITE_ONCE			0x0002
 #define SF_SPRITE_TEMPORARY		0x8000
 
+
+class CModel : public CBaseEntity
+{
+public:
+	void Spawn( void );
+	void EXPORT Animate();
+	void KeyValue( KeyValueData *pkvd );
+	int m_sequence;
+};
+
 class CSprite : public CPointEntity
 {
 public:

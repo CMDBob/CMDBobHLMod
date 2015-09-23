@@ -261,6 +261,23 @@ void AddAmmoNameToAmmoRegistry( const char *szAmmoname )
 	CBasePlayerItem::AmmoInfoArray[giAmmoIndex].iId = giAmmoIndex;   // yes, this info is redundant
 }
 
+BOOL IsWeaponSlotted( int id )
+{
+	// the list here is for weapons that don't need a slot.
+	switch ( id )
+	{
+	case WEAPON_CROWBAR:
+	case WEAPON_HANDGRENADE:
+	case WEAPON_TRIPMINE:
+	case WEAPON_SATCHEL:
+	case WEAPON_SNARK:
+		return false;
+		break;
+	default:
+		return true;
+		break;
+	}
+}
 
 // Precaches the weapon and queues the weapon info for sending to clients
 void UTIL_PrecacheOtherWeapon( const char *szClassname )
@@ -333,6 +350,7 @@ void W_Precache(void)
 	UTIL_PrecacheOtherWeapon( "weapon_9mmAR" );
 	UTIL_PrecacheOther( "ammo_9mmAR" );
 	UTIL_PrecacheOther( "ammo_ARgrenades" );
+	UTIL_PrecacheOther( "ammo_9mmbox" );
 
 #if !defined( OEM_BUILD ) && !defined( HLDEMO_BUILD )
 	// python
@@ -645,7 +663,13 @@ void CBasePlayerWeapon::ItemPostFrame( void )
 	if ((m_fInReload) && ( m_pPlayer->m_flNextAttack <= UTIL_WeaponTimeBase() ) )
 	{
 		// complete the reload. 
-		int j = min( iMaxClip() - m_iClip, m_pPlayer->m_rgAmmo[m_iPrimaryAmmoType]);	
+		int j = min( iMaxClip() - m_iClip, m_pPlayer->m_rgAmmo[m_iPrimaryAmmoType]);
+
+		if ( m_iCanChamberARound && m_iHasRoundChambered )
+		{
+			j++;
+			m_iHasRoundChambered = false;
+		}
 
 		// Add them to the clip
 		m_iClip += j;
@@ -729,6 +753,10 @@ void CBasePlayerItem::DestroyItem( void )
 	{
 		// if attached to a player, remove. 
 		m_pPlayer->RemovePlayerItem( this );
+
+		// if it's in a weapon slot, null it.
+		if ( IsWeaponSlotted( m_iId ) )
+			m_pPlayer->m_pSlots[m_iPlayerSlot] = NULL;
 	}
 
 	Kill( );
@@ -788,10 +816,143 @@ int CBasePlayerWeapon::AddDuplicate( CBasePlayerItem *pOriginal )
 	}
 }
 
+void WeaponPickupHudMsg( int id_incoming, int id_outgoing , CBasePlayer *pPlayer )
+{
+	char messageStr[255] = "Press USE to swap the ";
+
+	switch ( id_outgoing )
+	{
+	case WEAPON_GLOCK:
+		strcat( messageStr, "Glock 9mm" );
+		break;
+	case WEAPON_PYTHON:
+		strcat( messageStr, "Colt Python" );
+		break;
+	case WEAPON_MP5:
+		strcat( messageStr, "MP5" );
+		break;
+	case WEAPON_SHOTGUN:
+		strcat( messageStr, "SPAS-12" );
+		break;
+	case WEAPON_CROSSBOW:
+		strcat( messageStr, "Crossbow" );
+		break;
+	case WEAPON_HORNETGUN:
+		strcat( messageStr, "Hivehand" );
+		break;
+	case WEAPON_GAUSS:
+		strcat( messageStr, "Tau Cannon" );
+		break;
+	case WEAPON_EGON:
+		strcat( messageStr, "Gluon Gun" );
+		break;
+	case WEAPON_RPG:
+		strcat( messageStr, "RPG" );
+		break;
+	default:
+		break;
+	}
+
+	strcat( messageStr, " with the " );
+
+	switch ( id_incoming )
+	{
+	case WEAPON_GLOCK:
+		strcat( messageStr, "Glock 9mm" );
+		break;
+	case WEAPON_PYTHON:
+		strcat( messageStr, "Colt Python" );
+		break;
+	case WEAPON_MP5:
+		strcat( messageStr, "MP5" );
+		break;
+	case WEAPON_SHOTGUN:
+		strcat( messageStr, "SPAS-12" );
+		break;
+	case WEAPON_CROSSBOW:
+		strcat( messageStr, "Crossbow" );
+		break;
+	case WEAPON_HORNETGUN:
+		strcat( messageStr, "Hivehand" );
+		break;
+	case WEAPON_GAUSS:
+		strcat( messageStr, "Tau Cannon" );
+		break;
+	case WEAPON_EGON:
+		strcat( messageStr, "Gluon Gun" );
+		break;
+	case WEAPON_RPG:
+		strcat( messageStr, "RPG" );
+		break;
+	default:
+		break;
+	}
+
+	UTIL_ShowMessage( messageStr, pPlayer );
+}
 
 int CBasePlayerWeapon::AddToPlayer( CBasePlayer *pPlayer )
 {
 	int bResult = CBasePlayerItem::AddToPlayer( pPlayer );
+
+	int iPlayerSlot = -1;
+	
+	// does the incoming weapon  use a slot?
+	// if it doesn't, we don't have to find one and can skip over it entirely.
+	if ( IsWeaponSlotted( m_iId ) )
+	{
+		bool bFreeSlot = false;
+		// find the first free slot. if we can't find one, then we'll have to replace a gun.
+		for ( iPlayerSlot = 0; iPlayerSlot < MAX_PLAYER_WEAPON_SLOTS; ++iPlayerSlot )
+		{
+			if ( pPlayer->m_pSlots[iPlayerSlot] == NULL )
+			{
+				bFreeSlot = true;
+				break;
+			}
+		}
+		// if we couldn't find a free slot, now we have to check what weapon we currently have is in which slot, and then use it for our code.
+		if ( bFreeSlot == false )
+		{
+			CBasePlayerWeapon *pCurrentWeapon = (CBasePlayerWeapon*)pPlayer->m_pActiveItem;
+			iPlayerSlot = pCurrentWeapon->m_iPlayerSlot;
+			// is the current weapon an "undroppable" weapon? if it is, end here, as you can't do shit.
+			if ( !IsWeaponSlotted( pCurrentWeapon->m_iId ) )
+			{
+				return false;
+			}
+			if ( !( pPlayer->m_afButtonPressed & IN_USE ) )  // Make sure use is pressed before the weapon is picked up 
+			{
+				WeaponPickupHudMsg( m_iId, pCurrentWeapon->m_iId, pPlayer );
+				return FALSE;
+			}
+			else
+			{
+				CBasePlayerWeapon *DropPointer = (CBasePlayerWeapon *)CBaseEntity::Create( (char *)STRING( pCurrentWeapon->pev->classname ), pPlayer->pev->origin, Vector( 0, 0, 0 ) );  // Create the weapon 
+
+				if ( DropPointer )  //If the weapon creation was successful 
+				{
+					DropPointer->pev->velocity = pPlayer->pev->velocity;  // Inherit the player velocity  -  If you want to add a forward toss, add the vector here 
+					DropPointer->pev->avelocity = Vector( 0, RANDOM_FLOAT( 0, 100 ), 0 );  // This adds a bit of spin to the weapon. For more spin, increase the 100 value 
+					DropPointer->SetThink( &CBasePlayerItem::RetouchThink );  // This makes it so you can't initial pick up the weapon up. This avoids the problems where the weapon is constantly switched and new ones create (as use is held down for about a second) resulting in a no free edicts error. It also means you can add a delay before re-picking up, helping prevent counter-strike style weapon walks 
+					DropPointer->SetTouch( NULL );  // See above 
+					DropPointer->pev->nextthink = gpGlobals->time + 3.0;  // This is the delay before the weapon can be picked up again in seconds. This must be at least 1.0 to prevent errors and crashing. 
+					DropPointer->pev->solid = SOLID_NOT;  // This prevents the weapon getting stuck on the player and dropping very slowly. 
+					DropPointer->pev->spawnflags |= SF_NORESPAWN; // prevents the dropped weapon from respawning.
+					DropPointer->m_iDefaultAmmo = pCurrentWeapon->m_iClip;  // This sets the ammunition for the weapon. 
+				}
+				else
+				{
+					ALERT( at_error, "Could not create dropped weapon\n" );  // If the weapon was not created properly, alert the player 
+				}
+				//remove weapon from hud.
+				pPlayer->pev->weapons &= ~( 1 << pPlayer->m_pSlots[iPlayerSlot]->m_iId );
+
+				// Remove the weapon from the inventory.
+				pPlayer->m_pSlots[iPlayerSlot]->DestroyItem();
+			}
+		}
+	}
 
 	pPlayer->pev->weapons |= (1<<m_iId);
 
@@ -802,9 +963,25 @@ int CBasePlayerWeapon::AddToPlayer( CBasePlayer *pPlayer )
 	}
 
 
-	if (bResult)
-		return AddWeapon( );
+	if ( bResult )
+	{
+		if ( IsWeaponSlotted( m_iId ) )
+		{
+			pPlayer->m_pSlots[iPlayerSlot] = ( CBasePlayerWeapon * )this;  // Store the weapon pointer in the slot array for future reference 
+		}
+		m_iPlayerSlot = iPlayerSlot;
+		return AddWeapon();
+	}
 	return FALSE;
+}
+
+void CBasePlayerItem::RetouchThink( void )
+{
+	pev->solid = SOLID_TRIGGER;  // Makes it solid again 
+	UTIL_SetOrigin( pev, pev->origin );  // Links to the world. Probably not needed, but best to be safe 
+	SetTouch( &CBasePlayerItem::DefaultTouch ); // Set the touch to the normal touch function 
+	SetThink( NULL );  // Set the think to null so this doesn't keep getting called 
+	pev->nextthink = 0.0;  // Set the next think to 0, else it will screw up on subsequent thinks 
 }
 
 int CBasePlayerWeapon::UpdateClientData( CBasePlayer *pPlayer )
@@ -1013,8 +1190,10 @@ BOOL CBasePlayerWeapon :: DefaultReload( int iClipSize, int iAnim, float fDelay,
 
 	int j = min(iClipSize - m_iClip, m_pPlayer->m_rgAmmo[m_iPrimaryAmmoType]);	
 
-	if (j == 0)
-		return FALSE;
+	if ( j == 0 )
+	{
+			return FALSE;
+	}
 
 	m_pPlayer->m_flNextAttack = UTIL_WeaponTimeBase() + fDelay;
 

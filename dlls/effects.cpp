@@ -27,7 +27,6 @@
 
 #define SF_FUNNEL_REVERSE			1 // funnel effect repels particles instead of attracting them.
 
-
 // Lightning target, just alias landmark
 LINK_ENTITY_TO_CLASS( info_target, CPointEntity );
 
@@ -2266,3 +2265,76 @@ void CItemSoda::CanTouch ( CBaseEntity *pOther )
 	SetThink ( &CItemSoda::SUB_Remove );
 	pev->nextthink = gpGlobals->time;
 }
+
+
+//=========================================================
+// HL2 style prop model.
+//=========================================================
+#define MODEL_NON_SOLID 1 // lets the model be non solid.
+#define MODEL_FOLLOW_TARGET  2 // lets the model follow a target.
+
+void CModel::Spawn( void )
+{
+	pev->solid = SOLID_BBOX;
+	pev->movetype = MOVETYPE_NONE;
+	pev->effects = 0;
+	pev->frame = 0;
+
+	PRECACHE_MODEL( (char *)STRING( pev->model ) );
+	SET_MODEL( ENT( pev ), STRING( pev->model ) );
+	pev->scale = 255;
+	pev->size.x = pev->scale;
+	pev->size.y = pev->scale;
+	pev->size.z = pev->scale;
+
+	pev->sequence = m_sequence;
+
+	SetThink( &CModel::Animate );
+	pev->nextthink = gpGlobals->time + 0.5;
+
+	if ( FBitSet( pev->spawnflags, MODEL_NON_SOLID ) )
+	{
+		pev->solid = SOLID_NOT;
+	}
+	SetModelCollisionBox();
+}
+
+
+void CModel::KeyValue( KeyValueData *pkvd )
+{
+	if ( FStrEq( pkvd->szKeyName, "anim" ) )
+	{
+		m_sequence = atoi( pkvd->szValue );
+		pkvd->fHandled = TRUE;
+	}
+	else
+		CBaseEntity::KeyValue( pkvd );
+}
+
+void CModel::Animate()
+{
+	//set next think just a little in the future for our next frame//
+	SetThink( &CModel::Animate );
+	pev->nextthink = gpGlobals->time + 0.01;
+
+	//if the model has a sequence then play it//
+	pev->frame >255 ? pev->frame = 0 : pev->frame++;
+
+	///move with a target//
+	if ( FBitSet( pev->spawnflags, MODEL_FOLLOW_TARGET ) )
+	{
+		//find the models target//
+		edict_t    *pentTarget = NULL;
+		pentTarget = FIND_ENTITY_BY_TARGETNAME( pentTarget, STRING( pev->target ) );
+		if ( FNullEnt( pentTarget ) )
+			return;
+
+		//now move to that target//
+		Vector tmp = VARS( pentTarget )->origin;
+		UTIL_SetOrigin( pev, tmp );
+		pev->angles = VARS( pentTarget )->angles;
+
+	}
+}
+
+LINK_ENTITY_TO_CLASS( env_model, CModel );

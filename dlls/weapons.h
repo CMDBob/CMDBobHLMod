@@ -22,6 +22,8 @@ extern int gmsgWeapPickup;
 
 void DeactivateSatchels( CBasePlayer *pOwner );
 
+BOOL IsWeaponSlotted( int id );
+
 // Contact Grenade / Timed grenade / Satchel Charge
 class CGrenade : public CBaseMonster
 {
@@ -30,7 +32,7 @@ public:
 
 	typedef enum { SATCHEL_DETONATE = 0, SATCHEL_RELEASE } SATCHELCODE;
 
-	static CGrenade *ShootTimed( entvars_t *pevOwner, Vector vecStart, Vector vecVelocity, float time );
+	static CGrenade *ShootTimed( entvars_t *pevOwner, Vector vecStart, Vector vecVelocity, float time, int dmg = 100 );
 	static CGrenade *ShootContact( entvars_t *pevOwner, Vector vecStart, Vector vecVelocity );
 	static CGrenade *ShootSatchelCharge( entvars_t *pevOwner, Vector vecStart, Vector vecVelocity );
 	static void UseSatchelCharges( entvars_t *pevOwner, SATCHELCODE code );
@@ -233,6 +235,8 @@ public:
 	void EXPORT FallThink ( void );// when an item is first spawned, this think is run to determine when the object has hit the ground.
 	void EXPORT Materialize( void );// make a weapon visible and tangible
 	void EXPORT AttemptToMaterialize( void );  // the weapon desires to become visible and tangible, if the game rules allow for it
+	void EXPORT RetouchThink( void ); //Declaration for the retouch think function
+
 	CBaseEntity* Respawn ( void );// copy a weapon
 	void FallInit( void );
 	void CheckRespawn( void );
@@ -265,6 +269,7 @@ public:
 	CBasePlayer	*m_pPlayer;
 	CBasePlayerItem *m_pNext;
 	int		m_iId;												// WEAPON_???
+	int		m_iPlayerSlot;										// what slot are we in for the player?
 
 	virtual int iItemSlot( void ) { return 0; }			// return 0 to MAX_ITEMS_SLOTS, used in hud
 
@@ -277,6 +282,7 @@ public:
 	int			iMaxClip( void )	{ return ItemInfoArray[ m_iId ].iMaxClip; }
 	int			iWeight( void )		{ return ItemInfoArray[ m_iId ].iWeight; }
 	int			iFlags( void )		{ return ItemInfoArray[ m_iId ].iFlags; }
+	int         iSlot( void )       { return ItemInfoArray[ m_iId ].iSlot; }
 
 	// int		m_iIdPrimary;										// Unique Id for primary ammo
 	// int		m_iIdSecondary;										// Unique Id for secondary ammo
@@ -351,6 +357,8 @@ public:
 	int		m_iClientClip;										// the last version of m_iClip sent to hud dll
 	int		m_iClientWeaponState;								// the last version of the weapon state sent to hud dll (is current weapon, is on target)
 	int		m_fInReload;										// Are we in the middle of a reload;
+	int		m_iCanChamberARound;								// Can the weapon have a round "chambered", therefore giving it an extra round if reloaded while ammo is in?
+	int		m_iHasRoundChambered;								// Checks if the weapon has a round chambered.
 
 	int		m_iDefaultAmmo;// how much ammo you get when you pick up this weapon as placed by a level designer.
 	

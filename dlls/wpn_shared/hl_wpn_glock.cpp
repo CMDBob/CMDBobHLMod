@@ -47,6 +47,8 @@ void CGlock::Spawn( )
 
 	m_iDefaultAmmo = GLOCK_DEFAULT_GIVE;
 
+	m_iCanChamberARound = true;
+
 	FallInit();// get ready to fall down.
 }
 
@@ -178,10 +180,16 @@ void CGlock::Reload( void )
 
 	int iResult;
 
-	if (m_iClip == 0)
-		iResult = DefaultReload( 17, GLOCK_RELOAD, 1.5 );
+	if ( m_iClip == 0 )
+	{
+		iResult = DefaultReload( GLOCK_MAX_CLIP, GLOCK_RELOAD_NOT_EMPTY, 1.5 );
+		m_iHasRoundChambered = false;
+	}
 	else
-		iResult = DefaultReload( 17, GLOCK_RELOAD_NOT_EMPTY, 1.5 );
+	{
+		iResult = DefaultReload( GLOCK_MAX_CLIP + 1, GLOCK_RELOAD, 1.5 );
+		m_iHasRoundChambered = true;
+	}
 
 	if (iResult)
 	{
